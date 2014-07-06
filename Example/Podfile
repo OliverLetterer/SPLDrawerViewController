@@ -1,0 +1,9 @@
+
+target 'SPLDrawerViewController', :exclusive => true do
+  pod "SPLDrawerViewController", :path => "../"
+
+  pod 'Specta', '~> 0.2.1'
+  pod 'Expecta'
+  pod 'FBSnapshotTestCase'
+  pod 'EXPMatchers+FBSnapshotTest'
+end
