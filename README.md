@@ -1,6 +1,6 @@
 # SPLDrawerViewController
 
-[![CI Status](http://img.shields.io/travis/Oliver Letterer/SPLDrawerViewController.svg?style=flat)](https://travis-ci.org/Oliver Letterer/SPLDrawerViewController)
+[![CI Status](http://img.shields.io/travis/OliverLetterer/SPLDrawerViewController.svg?style=flat)](https://travis-ci.org/OliverLetterer/SPLDrawerViewController)
 [![Version](https://img.shields.io/cocoapods/v/SPLDrawerViewController.svg?style=flat)](http://cocoadocs.org/docsets/SPLDrawerViewController)
 [![License](https://img.shields.io/cocoapods/l/SPLDrawerViewController.svg?style=flat)](http://cocoadocs.org/docsets/SPLDrawerViewController)
 [![Platform](https://img.shields.io/cocoapods/p/SPLDrawerViewController.svg?style=flat)](http://cocoadocs.org/docsets/SPLDrawerViewController)
