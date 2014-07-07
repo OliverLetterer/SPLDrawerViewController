@@ -140,16 +140,16 @@
     _panGestureRecognizers = @[ edgePanGestureRecognizer, panGestureRecognizer ];
 }
 
-- (void)viewWillLayoutSubviews
-{
-    [super viewWillLayoutSubviews];
-    self.drawerWasVisible = self.isDrawerVisible;
-}
-
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
     [self _layoutDrawerView];
+}
+
+- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
+{
+    [super willRotateToInterfaceOrientation:toInterfaceOrientation duration:duration];
+    self.drawerWasVisible = self.isDrawerVisible;
 }
 
 - (NSUInteger)supportedInterfaceOrientations
@@ -324,7 +324,7 @@
     while (drawerViewController && ![drawerViewController isKindOfClass:[SPLDrawerViewController class]]) {
         drawerViewController = drawerViewController.parentViewController;
     }
-
+    
     return (SPLDrawerViewController *)drawerViewController;
 }
 
