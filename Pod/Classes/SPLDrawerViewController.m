@@ -82,6 +82,16 @@
     return self.isInCompactHorizontalSizeClass ? CGRectGetWidth(self.view.bounds) : 320.0;
 }
 
+- (void)setDrawerViewControllerVisible:(BOOL)visible animated:(BOOL)animated
+{
+    if (animated) {
+        [self _animateDrawerWithVelocity:visible ? -100.0 : 100.0];
+    } else {
+        self.drawerWasVisible = YES;
+        [self viewDidLayoutSubviews];
+    }
+}
+
 #pragma mark - Initialization
 
 - (instancetype)initWithMasterViewController:(UIViewController *)masterViewController drawerViewController:(UIViewController *)drawerViewController

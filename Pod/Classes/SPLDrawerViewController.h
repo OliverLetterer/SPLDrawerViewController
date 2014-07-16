@@ -35,6 +35,8 @@
 @property (nonatomic, readonly) UIViewController *masterViewController;
 @property (nonatomic, readonly) UIViewController *drawerViewController;
 
+- (void)setDrawerViewControllerVisible:(BOOL)visible animated:(BOOL)animated;
+
 - (instancetype)initWithMasterViewController:(UIViewController *)masterViewController drawerViewController:(UIViewController *)drawerViewController;
 
 @end
