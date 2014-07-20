@@ -70,11 +70,7 @@
 
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
-    if (self.isInCompactHorizontalSizeClass && CGRectGetMinX(self.drawerView.frame) < CGRectGetWidth(self.view.bounds)) {
-        return UIStatusBarStyleLightContent;
-    }
-
-    return [super preferredStatusBarStyle];
+    return self.masterViewController.preferredStatusBarStyle;
 }
 
 - (CGFloat)drawerSize
