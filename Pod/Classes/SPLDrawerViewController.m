@@ -25,36 +25,69 @@
 
 #import "SPLDrawerViewController.h"
 
+@interface SPLDrawerViewController () <UIViewControllerTransitioningDelegate, UIViewControllerAnimatedTransitioning, UIViewControllerInteractiveTransitioning, UIDynamicAnimatorDelegate, UICollisionBehaviorDelegate>
 
+@property (nonatomic, readonly) CGFloat progress;
 
-@interface SPLDrawerViewController () <UICollisionBehaviorDelegate, UIDynamicAnimatorDelegate>
+@property (nonatomic, strong) UIView *dimmingBackgroundView;
+@property (nonatomic, readonly) UIView *drawerView;
+@property (nonatomic, readonly) UIView *drawerContainerView;
 
 @property (nonatomic, readonly) BOOL isInCompactHorizontalSizeClass;
 
 @property (nonatomic, assign) NSInteger collisionCount;
-
-@property (nonatomic, assign) BOOL drawerWasVisible;
-@property (nonatomic, readonly) BOOL isDrawerVisible;
 @property (nonatomic, readonly) CGFloat drawerSize;
-
-@property (nonatomic, readonly) UIView *drawerView;
-@property (nonatomic, readonly) UIView *drawerContainerView;
 
 @property (nonatomic, strong) UIDynamicAnimator *dynamicAnimator;
 
-@property (nonatomic, readonly) UIView *dismissView;
+@property (nonatomic, strong) UIPanGestureRecognizer *dismissPanGestureRecognizer;
+@property (nonatomic, strong) id<UIViewControllerContextTransitioning> interactiveTransitionContext;
+
+@property (nonatomic, strong) dispatch_block_t animationCompletionHandler;
 
 @end
-
-
 
 @implementation SPLDrawerViewController
 
 #pragma mark - setters and getters
 
-- (BOOL)isDrawerVisible
+- (CGFloat)progress
 {
-    return CGRectGetMinX(self.drawerView.frame) < CGRectGetMaxX(self.masterViewController.view.bounds);
+    CGFloat progress = (CGRectGetWidth(self.view.bounds) - CGRectGetMinX(self.drawerView.frame)) / self.drawerSize;
+
+    if (self.isBeingDismissed) {
+        progress = 1.0 - progress;
+    }
+
+    return MAX(MIN(progress, 1.0), 0.0);
+}
+
+- (void)setScreenEdgePanGestureRecognizer:(UIScreenEdgePanGestureRecognizer *)screenEdgePanGestureRecognizer
+{
+    NSParameterAssert(screenEdgePanGestureRecognizer && screenEdgePanGestureRecognizer.state == UIGestureRecognizerStateBegan);
+
+    if (screenEdgePanGestureRecognizer != _screenEdgePanGestureRecognizer) {
+        _screenEdgePanGestureRecognizer = screenEdgePanGestureRecognizer;
+
+        [_screenEdgePanGestureRecognizer addTarget:self action:@selector(_panGestureRecognized:)];
+    }
+}
+
+- (void)setAnimationCompletionHandler:(dispatch_block_t)animationCompletionHandler
+{
+    if (!animationCompletionHandler) {
+        _animationCompletionHandler = nil;
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    _animationCompletionHandler = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        strongSelf.animationCompletionHandler = nil;
+        strongSelf.dynamicAnimator = nil;
+
+        animationCompletionHandler();
+    };
 }
 
 - (BOOL)isInCompactHorizontalSizeClass
@@ -70,42 +103,32 @@
 
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
-    return self.masterViewController.preferredStatusBarStyle;
+    return self.presentingViewController.preferredStatusBarStyle;
 }
 
 - (CGFloat)drawerSize
 {
-    return self.isInCompactHorizontalSizeClass ? CGRectGetWidth(self.view.bounds) : 320.0;
+    return self.drawerViewController.preferredContentSize.width;
 }
 
-- (void)setDrawerViewControllerVisible:(BOOL)visible animated:(BOOL)animated
+#pragma mark - UIViewController
+
+- (id<UIViewControllerTransitioningDelegate>)transitioningDelegate
 {
-    if (animated) {
-        [self _animateDrawerWithVelocity:visible ? -100.0 : 100.0];
-    } else {
-        self.drawerWasVisible = YES;
-        [self viewDidLayoutSubviews];
-    }
+    return self;
 }
 
-#pragma mark - Initialization
+- (UIModalPresentationStyle)modalPresentationStyle
+{
+    return UIModalPresentationCustom;
+}
 
-- (instancetype)initWithMasterViewController:(UIViewController *)masterViewController drawerViewController:(UIViewController *)drawerViewController
+- (instancetype)initWithDrawerViewController:(UIViewController *)drawerViewController
 {
     if (self = [super init]) {
-        _masterViewController = masterViewController;
         _drawerViewController = drawerViewController;
-
-        [self addChildViewController:_masterViewController];
-        [_masterViewController didMoveToParentViewController:self];
-
         [self addChildViewController:_drawerViewController];
         [_drawerViewController didMoveToParentViewController:self];
-
-        if ([self respondsToSelector:@selector(setRestorationIdentifier:)]) {
-            self.restorationIdentifier = NSStringFromClass(self.class);
-            self.restorationClass = self.class;
-        }
     }
     return self;
 }
@@ -116,18 +139,12 @@
 {
     [super loadView];
 
-    self.masterViewController.view.frame = self.view.bounds;
-    self.masterViewController.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [self.view addSubview:self.masterViewController.view];
-
-    _dismissView = [[UIView alloc] initWithFrame:self.view.bounds];
-    _dismissView.backgroundColor = [UIColor clearColor];
-    _dismissView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _dismissView.hidden = YES;
-    [self.view addSubview:_dismissView];
-
-    UITapGestureRecognizer *dismissGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_dismissDrawer)];
-    [_dismissView addGestureRecognizer:dismissGestureRecognizer];
+    _dimmingBackgroundView = [[UIView alloc] initWithFrame:self.view.bounds];
+    _dimmingBackgroundView.alpha = 0.0;
+    _dimmingBackgroundView.userInteractionEnabled = NO;
+    _dimmingBackgroundView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.5];
+    _dimmingBackgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view addSubview:_dimmingBackgroundView];
 
     [self _loadDrawerView];
     self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds), 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
@@ -136,26 +153,22 @@
     self.drawerViewController.view.backgroundColor = [UIColor clearColor];
     [self.drawerContainerView addSubview:self.drawerViewController.view];
 
-    UIScreenEdgePanGestureRecognizer *edgePanGestureRecognizer = [[UIScreenEdgePanGestureRecognizer alloc] initWithTarget:self action:@selector(_panGestureRecognized:)];
-    edgePanGestureRecognizer.edges = UIRectEdgeRight;
-    [self.view addGestureRecognizer:edgePanGestureRecognizer];
+    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_dismissDrawerTapped)];
+    [self.view addGestureRecognizer:tapRecognizer];
 
-    UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(_panGestureRecognized:)];
-    [self.drawerView addGestureRecognizer:panGestureRecognizer];
-
-    _panGestureRecognizers = @[ edgePanGestureRecognizer, panGestureRecognizer ];
+    _dismissPanGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(_panGestureRecognized:)];
+    [self.view addGestureRecognizer:_dismissPanGestureRecognizer];
 }
 
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
-    [self _layoutDrawerView];
-}
 
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
-{
-    [super willRotateToInterfaceOrientation:toInterfaceOrientation duration:duration];
-    self.drawerWasVisible = self.isDrawerVisible;
+    if (self.isBeingPresented) {
+        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds), 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
+    } else {
+        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds) - self.drawerSize, 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
+    }
 }
 
 - (NSUInteger)supportedInterfaceOrientations
@@ -167,32 +180,105 @@
     }
 }
 
-#pragma mark - UIViewControllerRestoration
+#pragma mark - UIViewControllerTransitioningDelegate
 
-+ (UIViewController *)viewControllerWithRestorationIdentifierPath:(NSArray *)identifierComponents coder:(NSCoder *)coder
+- (id <UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented presentingController:(UIViewController *)presenting sourceController:(UIViewController *)source
 {
-    return [[self alloc] init];
+    return self;
 }
 
-#pragma mark - UIStateRestoration
-
-- (void)encodeRestorableStateWithCoder:(NSCoder *)coder
+- (id <UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed
 {
-    [super encodeRestorableStateWithCoder:coder];
-
+    return self;
 }
 
-- (void)decodeRestorableStateWithCoder:(NSCoder *)coder
+- (id <UIViewControllerInteractiveTransitioning>)interactionControllerForPresentation:(id <UIViewControllerAnimatedTransitioning>)animator
 {
-    [super decodeRestorableStateWithCoder:coder];
+    if (self.screenEdgePanGestureRecognizer && self.screenEdgePanGestureRecognizer.state == UIGestureRecognizerStateBegan) {
+        return self;
+    }
 
+    return nil;
+}
+
+- (id <UIViewControllerInteractiveTransitioning>)interactionControllerForDismissal:(id <UIViewControllerAnimatedTransitioning>)animator
+{
+    if (self.dismissPanGestureRecognizer.state == UIGestureRecognizerStateBegan) {
+        return self;
+    }
+
+    return nil;
+}
+
+#pragma mark - UIViewControllerInteractiveTransitioning
+
+- (void)startInteractiveTransition:(id <UIViewControllerContextTransitioning>)transitionContext
+{
+    if (self.isBeingPresented) {
+        UIView *containerView = [transitionContext containerView];
+
+        self.view.frame = containerView.bounds;
+        [containerView addSubview:self.view];
+    }
+
+    self.interactiveTransitionContext = transitionContext;
+}
+
+#pragma mark - UIViewControllerAnimatedTransitioning
+
+- (NSTimeInterval)transitionDuration:(id <UIViewControllerContextTransitioning>)transitionContext
+{
+    UIViewController *toViewController = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+    return toViewController.isBeingPresented ? 0.5 : 0.3;
+}
+
+- (void)animateTransition:(id<UIViewControllerContextTransitioning>)transitionContext
+{
+    UIViewController *toViewController = [transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+
+    if (toViewController.isBeingPresented) {
+        [self _performPresentViewControllerAnimationInTransitionInContext:transitionContext];
+    } else {
+        [self _performDismissTransitionInContext:transitionContext];
+    }
+}
+
+- (void)_performPresentViewControllerAnimationInTransitionInContext:(id<UIViewControllerContextTransitioning>)transitionContext
+{
+    UIView *containerView = [transitionContext containerView];
+
+    self.view.frame = containerView.bounds;
+    [containerView addSubview:self.view];
+
+    UIViewAnimationOptions options = UIViewAnimationOptionAllowUserInteraction;
+    [UIView animateWithDuration:[self transitionDuration:transitionContext] delay:0.0 usingSpringWithDamping:1.0 initialSpringVelocity:0.0 options:options animations:^{
+        self.dimmingBackgroundView.alpha = 1.0;
+        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds) - self.drawerSize, 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
+    } completion:NULL];
+
+    double delayInSeconds = [self transitionDuration:transitionContext] / 2.0;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        [transitionContext completeTransition:YES];
+    });
+}
+
+- (void)_performDismissTransitionInContext:(id<UIViewControllerContextTransitioning>)transitionContext
+{
+    UIViewAnimationOptions options = UIViewAnimationOptionAllowUserInteraction;
+    [UIView animateWithDuration:[self transitionDuration:transitionContext] delay:0.0 usingSpringWithDamping:1.0 initialSpringVelocity:0.0 options:options animations:^{
+        self.dimmingBackgroundView.alpha = 0.0;
+        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds), 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
+    } completion:^(BOOL finished) {
+        [transitionContext completeTransition:YES];
+    }];
 }
 
 #pragma mark - UIDynamicAnimatorDelegate
 
 - (void)dynamicAnimatorDidPause:(UIDynamicAnimator *)animator
 {
-    [self _animationDidStop];
+    self.animationCompletionHandler();
 }
 
 #pragma mark - UICollisionBehaviorDelegate
@@ -202,7 +288,7 @@
     self.collisionCount++;
 
     if (self.collisionCount == 2) {
-        [self _animationDidStop];
+        self.animationCompletionHandler();
     }
 }
 
@@ -238,12 +324,21 @@
     [self.view addSubview:_drawerView];
 }
 
+- (void)_dismissDrawerTapped
+{
+    [self dismissViewControllerAnimated:YES completion:NULL];
+}
+
 - (void)_panGestureRecognized:(UIPanGestureRecognizer *)recognizer
 {
     switch (recognizer.state) {
         case UIGestureRecognizerStateBegan: {
             self.collisionCount = 0;
             self.dynamicAnimator = nil;
+
+            if (recognizer == self.dismissPanGestureRecognizer && !self.isBeingDismissed) {
+                [self dismissViewControllerAnimated:YES completion:NULL];
+            }
             break;
         }
         case UIGestureRecognizerStateChanged: {
@@ -256,6 +351,9 @@
             center.x = MAX(center.x, CGRectGetMaxX(self.view.bounds) - self.drawerSize / 2.0);
             center.x = MIN(center.x, CGRectGetMaxX(self.view.bounds) + self.drawerSize / 2.0);
             self.drawerView.center = center;
+
+            [self _updateDimmingBackgroundView];
+            [self.interactiveTransitionContext updateInteractiveTransition:self.progress];
             break;
         }
         case UIGestureRecognizerStateCancelled:
@@ -286,52 +384,42 @@
     UIGravityBehavior *gravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[ self.drawerView ]];
     gravityBehavior.gravityDirection = CGVectorMake(velocity < 0.0 ? - 5.0 : 5.0, 0.0);
     [self.dynamicAnimator addBehavior:gravityBehavior];
+
+    __weak typeof(self) weakSelf = self;
+    UIDynamicBehavior *progressBehavior = [[UIDynamicBehavior alloc] init];
+    [progressBehavior setAction:^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+
+        [strongSelf _updateDimmingBackgroundView];
+        [strongSelf.interactiveTransitionContext updateInteractiveTransition:strongSelf.progress];
+    }];
+    [self.dynamicAnimator addBehavior:progressBehavior];
+
+    [self setAnimationCompletionHandler:^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+
+        [strongSelf.screenEdgePanGestureRecognizer removeTarget:strongSelf action:@selector(_panGestureRecognized:)];
+        if ((velocity < 0 && strongSelf.isBeingDismissed) || (velocity > 0 && strongSelf.isBeingPresented)) {
+            [strongSelf.interactiveTransitionContext cancelInteractiveTransition];
+            [strongSelf.interactiveTransitionContext completeTransition:NO];
+        } else {
+            [strongSelf.interactiveTransitionContext finishInteractiveTransition];
+            [strongSelf.interactiveTransitionContext completeTransition:YES];
+        }
+
+        strongSelf.interactiveTransitionContext = nil;
+    }];
 }
 
-- (void)_animationDidStop
+- (void)_updateDimmingBackgroundView
 {
-    self.dynamicAnimator = nil;
-
-    CGRect visibleDrawerRect = UIEdgeInsetsInsetRect(self.view.bounds, UIEdgeInsetsMake(0.0, CGRectGetWidth(self.view.bounds) - self.drawerSize, 0.0, - self.drawerSize));
-    self.drawerWasVisible = fabs(CGRectGetMinX(self.drawerView.frame) - CGRectGetMinX(visibleDrawerRect)) < fabs(CGRectGetMaxX(self.drawerView.frame) - CGRectGetMaxX(visibleDrawerRect));
-
-    [self _layoutDrawerView];
-}
-
-- (void)_layoutDrawerView
-{
-    CGFloat drawerSize = self.drawerSize;
-
-    if (self.drawerWasVisible) {
-        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds) - drawerSize, 0.0, drawerSize, CGRectGetHeight(self.view.bounds));
+    if (self.isBeingPresented) {
+        self.dimmingBackgroundView.alpha = self.progress;
+    } else if (self.isBeingDismissed) {
+        self.dimmingBackgroundView.alpha = 1.0 - self.progress;
     } else {
-        self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds), 0.0, drawerSize, CGRectGetHeight(self.view.bounds));
+        self.dimmingBackgroundView.alpha = 1.0;
     }
-
-    [self setNeedsStatusBarAppearanceUpdate];
-    self.dismissView.hidden = !self.isDrawerVisible;
-}
-
-- (void)_dismissDrawer
-{
-    [self _animateDrawerWithVelocity:0.01];
-}
-
-@end
-
-
-
-@implementation UIViewController (SPLDrawerViewController)
-
-- (SPLDrawerViewController *)drawerViewController
-{
-    UIViewController *drawerViewController = self;
-
-    while (drawerViewController && ![drawerViewController isKindOfClass:[SPLDrawerViewController class]]) {
-        drawerViewController = drawerViewController.parentViewController;
-    }
-    
-    return (SPLDrawerViewController *)drawerViewController;
 }
 
 @end

@@ -23,28 +23,11 @@
 //  THE SOFTWARE.
 //
 
+@interface SPLDrawerViewController : UIViewController
 
+@property (nonatomic, strong) UIScreenEdgePanGestureRecognizer *screenEdgePanGestureRecognizer;
 
-/**
- @abstract  <#abstract comment#>
- */
-@interface SPLDrawerViewController : UIViewController <UIViewControllerRestoration>
-
-@property (nonatomic, readonly) NSArray *panGestureRecognizers;
-
-@property (nonatomic, readonly) UIViewController *masterViewController;
 @property (nonatomic, readonly) UIViewController *drawerViewController;
-
-- (void)setDrawerViewControllerVisible:(BOOL)visible animated:(BOOL)animated;
-
-- (instancetype)initWithMasterViewController:(UIViewController *)masterViewController drawerViewController:(UIViewController *)drawerViewController;
-
-@end
-
-
-
-@interface UIViewController (SPLDrawerViewController)
-
-@property (nonatomic, readonly) SPLDrawerViewController *drawerViewController;
+- (instancetype)initWithDrawerViewController:(UIViewController *)drawerViewController;
 
 @end
