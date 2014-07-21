@@ -164,7 +164,7 @@
 {
     [super viewDidLayoutSubviews];
 
-    if (self.isBeingPresented) {
+    if (self.isBeingPresented && self.interactiveTransitionContext) {
         self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds), 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
     } else {
         self.drawerView.frame = CGRectMake(CGRectGetWidth(self.view.bounds) - self.drawerSize, 0.0, self.drawerSize, CGRectGetHeight(self.view.bounds));
