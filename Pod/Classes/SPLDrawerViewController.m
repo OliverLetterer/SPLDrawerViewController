@@ -25,11 +25,110 @@
 
 #import "SPLDrawerViewController.h"
 
+@interface _SPLDrawerGradientView : UIView
+
+@property (nonatomic, retain) NSArray *colors;
+- (void)setColors:(NSArray *)colors atLocations:(CGFloat *)locations;
+@property (nonatomic, assign) CGGradientRef gradient;
+
+@end
+
+@implementation _SPLDrawerGradientView
+
+#pragma mark - setters and getters
+
+- (void)setColors:(NSArray *)colors
+{
+    // calculate the locations, at which the gradient will align its colors
+    CGFloat numberOfColors = (CGFloat) _colors.count;
+    CGFloat *locations = malloc(sizeof(CGFloat) * numberOfColors);
+    for (int i = 0; i < numberOfColors; i++) {
+        locations[i] = ((CGFloat)i) / (numberOfColors - 1);
+    }
+
+    [self setColors:colors atLocations:locations];
+
+    free(locations);
+}
+
+- (void)setColors:(NSArray *)colors atLocations:(CGFloat *)locations
+{
+    _colors = colors;
+
+    if (_gradient != NULL) {
+        CGGradientRelease(_gradient), _gradient = NULL;
+    }
+
+    CGColorSpaceRef colorSpace = NULL;
+
+    NSMutableArray *CGColorsArray = [NSMutableArray arrayWithCapacity:_colors.count];
+    for (UIColor *color in _colors) {
+        [CGColorsArray addObject:(id)color.CGColor];
+        colorSpace = CGColorGetColorSpace(color.CGColor);
+    }
+
+    _gradient = CGGradientCreateWithColors(colorSpace, (__bridge CFArrayRef)CGColorsArray, locations);
+
+    [self setNeedsDisplay];
+}
+
+- (void)setFrame:(CGRect)frame
+{
+    CGRect bounds = self.bounds;
+    [super setFrame:frame];
+    if (!CGRectEqualToRect(bounds, self.bounds)) {
+        [self setNeedsDisplay];
+    }
+}
+
+#pragma mark - Initialization
+
+- (id)initWithFrame:(CGRect)frame
+{
+    if (self = [super initWithFrame:frame]) {
+        // Initialization code
+        self.userInteractionEnabled = NO;
+        self.backgroundColor = [UIColor clearColor];
+        self.layer.opaque = NO;
+        self.layer.needsDisplayOnBoundsChange = YES;
+        self.colors = @[ [UIColor colorWithRed:240.0f/255.0f green:240.0f/255.0f blue:240.0f/255.0f alpha:1.0f], [UIColor colorWithRed:192.0f/255.0f green:192.0f/255.0f blue:192.0f/255.0f alpha:1.0f]];
+    }
+    return self;
+}
+
+- (void)drawRect:(CGRect)rect
+{
+    if (!_gradient) {
+        return;
+    }
+
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextDrawLinearGradient(context, _gradient,
+                                CGPointMake(CGRectGetWidth(self.bounds) / 2.0f, 0.0f),
+                                CGPointMake(CGRectGetWidth(self.bounds) / 2.0f, CGRectGetHeight(self.bounds)),
+                                0.0f);
+}
+
+#pragma mark - Memory management
+
+- (void)dealloc
+{
+    if (_gradient) {
+        CGGradientRelease(_gradient), _gradient = NULL;
+    }
+}
+
+@end
+
+
+
 @interface SPLDrawerViewController () <UIViewControllerTransitioningDelegate, UIViewControllerAnimatedTransitioning, UIViewControllerInteractiveTransitioning, UIDynamicAnimatorDelegate, UICollisionBehaviorDelegate>
 
 @property (nonatomic, readonly) CGFloat progress;
 
 @property (nonatomic, strong) UIView *dimmingBackgroundView;
+@property (nonatomic, strong) _SPLDrawerGradientView *shadowView;
+
 @property (nonatomic, readonly) UIView *drawerView;
 @property (nonatomic, readonly) UIView *drawerContainerView;
 
@@ -142,7 +241,7 @@
     _dimmingBackgroundView = [[UIView alloc] initWithFrame:self.view.bounds];
     _dimmingBackgroundView.alpha = 0.0;
     _dimmingBackgroundView.userInteractionEnabled = NO;
-    _dimmingBackgroundView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.5];
+    _dimmingBackgroundView.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.25];
     _dimmingBackgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.view addSubview:_dimmingBackgroundView];
 
@@ -152,6 +251,15 @@
     self.drawerViewController.view.frame = self.drawerView.bounds;
     self.drawerViewController.view.backgroundColor = [UIColor clearColor];
     [self.drawerContainerView addSubview:self.drawerViewController.view];
+
+    CGFloat shadowWidth = 4.0;
+
+    _shadowView = [[_SPLDrawerGradientView alloc] initWithFrame:CGRectZero];
+    _shadowView.colors = @[ [UIColor colorWithWhite:0.0 alpha:0.25], [UIColor colorWithWhite:0.0 alpha:0.0] ];
+    _shadowView.transform = CGAffineTransformMakeRotation(M_PI_2);
+    _shadowView.frame = CGRectMake(-shadowWidth, 0.0, shadowWidth, CGRectGetHeight(self.drawerView.bounds));
+    _shadowView.autoresizingMask = UIViewAutoresizingFlexibleHeight;
+    [self.drawerView addSubview:_shadowView];
 
     UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_dismissDrawerTapped)];
     [self.view addGestureRecognizer:tapRecognizer];
