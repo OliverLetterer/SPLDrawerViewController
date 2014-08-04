@@ -135,6 +135,7 @@
 @property (nonatomic, readonly) BOOL isInCompactHorizontalSizeClass;
 
 @property (nonatomic, assign) NSInteger collisionCount;
+@property (nonatomic, assign) CGFloat collisionVelocity;
 @property (nonatomic, readonly) CGFloat drawerSize;
 
 @property (nonatomic, strong) UIDynamicAnimator *dynamicAnimator;
@@ -391,9 +392,13 @@
 
 #pragma mark - UICollisionBehaviorDelegate
 
-- (void)collisionBehavior:(UICollisionBehavior*)behavior beganContactForItem:(id <UIDynamicItem>)item withBoundaryIdentifier:(id <NSCopying>)identifier atPoint:(CGPoint)p
+- (void)collisionBehavior:(UICollisionBehavior*)behavior beganContactForItem:(id <UIDynamicItem>)item withBoundaryIdentifier:(id <NSCopying>)identifier atPoint:(CGPoint)point
 {
-    self.collisionCount++;
+    if (self.collisionVelocity <= 0.0 && point.x < CGRectGetWidth(self.view.bounds)) {
+        self.collisionCount++;
+    } else if (self.collisionVelocity >= 0.0 && point.x > CGRectGetWidth(self.view.bounds)) {
+        self.collisionCount++;
+    }
 
     if (self.collisionCount == 2) {
         self.animationCompletionHandler();
@@ -479,6 +484,7 @@
 {
     self.dynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self.view];
     self.dynamicAnimator.delegate = self;
+    self.collisionVelocity = velocity;
 
     UICollisionBehavior *collisionBevavior = [[UICollisionBehavior alloc] initWithItems:@[ self.drawerView ]];
     collisionBevavior.collisionDelegate = self;
