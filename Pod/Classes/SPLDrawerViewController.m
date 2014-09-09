@@ -122,7 +122,7 @@
 
 
 
-@interface SPLDrawerViewController () <UIViewControllerTransitioningDelegate, UIViewControllerAnimatedTransitioning, UIViewControllerInteractiveTransitioning, UIDynamicAnimatorDelegate, UICollisionBehaviorDelegate>
+@interface SPLDrawerViewController () <UIViewControllerTransitioningDelegate, UIViewControllerAnimatedTransitioning, UIViewControllerInteractiveTransitioning, UIDynamicAnimatorDelegate, UICollisionBehaviorDelegate, UIGestureRecognizerDelegate>
 
 @property (nonatomic, readonly) CGFloat progress;
 
@@ -140,6 +140,7 @@
 
 @property (nonatomic, strong) UIDynamicAnimator *dynamicAnimator;
 
+@property (nonatomic, strong) UITapGestureRecognizer *dismissTapGestureRecognizer;
 @property (nonatomic, strong) UIPanGestureRecognizer *dismissPanGestureRecognizer;
 @property (nonatomic, strong) id<UIViewControllerContextTransitioning> interactiveTransitionContext;
 
@@ -262,8 +263,9 @@
     _shadowView.autoresizingMask = UIViewAutoresizingFlexibleHeight;
     [self.drawerView addSubview:_shadowView];
 
-    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_dismissDrawerTapped)];
-    [self.view addGestureRecognizer:tapRecognizer];
+    _dismissTapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_dismissDrawerTapped)];
+    _dismissTapGestureRecognizer.delegate = self;
+    [self.view addGestureRecognizer:_dismissTapGestureRecognizer];
 
     _dismissPanGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(_panGestureRecognized:)];
     [self.view addGestureRecognizer:_dismissPanGestureRecognizer];
@@ -403,6 +405,26 @@
     if (self.collisionCount == 2) {
         self.animationCompletionHandler();
     }
+}
+
+#pragma mark - UIGestureRecognizerDelegate
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+{
+    if (gestureRecognizer == self.dismissTapGestureRecognizer) {
+        UIView *view = [self.view hitTest:[gestureRecognizer locationInView:self.view] withEvent:nil];
+        UIView *superview = view;
+
+        while (superview) {
+            if ([superview isKindOfClass:[UITableViewCell class]]) {
+                return NO;
+            }
+
+            superview = superview.superview;
+        }
+    }
+
+    return YES;
 }
 
 #pragma mark - Private category implementation ()
