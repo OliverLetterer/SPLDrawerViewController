@@ -282,15 +282,6 @@
     }
 }
 
-- (NSUInteger)supportedInterfaceOrientations
-{
-    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-        return UIInterfaceOrientationMaskAll;
-    } else {
-        return UIInterfaceOrientationMaskPortrait;
-    }
-}
-
 #pragma mark - UIViewControllerTransitioningDelegate
 
 - (id <UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented presentingController:(UIViewController *)presenting sourceController:(UIViewController *)source
