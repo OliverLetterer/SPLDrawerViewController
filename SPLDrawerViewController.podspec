@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "SPLDrawerViewController"
-  s.version          = "0.4.3"
+  s.version          = "0.5.0"
   s.summary          = "iOS 7 / 8 drawer view controller."
   s.description      = "Like notification center, just from the right screen edge."
   s.homepage         = "https://github.com/OliverLetterer/SPLDrawerViewController"
