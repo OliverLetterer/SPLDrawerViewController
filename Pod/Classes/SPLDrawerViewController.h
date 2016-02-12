@@ -2,7 +2,7 @@
 //  SPLDrawerViewController.h
 //
 //  The MIT License (MIT)
-//  Copyright (c) 2014 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2014-2016 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -23,11 +23,19 @@
 //  THE SOFTWARE.
 //
 
+#import <UIKit/UIKit.h>
+
+
+
+NS_ASSUME_NONNULL_BEGIN
+
 @interface SPLDrawerViewController : UIViewController
 
-@property (nonatomic, strong) UIScreenEdgePanGestureRecognizer *screenEdgePanGestureRecognizer;
+@property (nonatomic, nullable) UIScreenEdgePanGestureRecognizer *screenEdgePanGestureRecognizer;
 
 @property (nonatomic, readonly) UIViewController *drawerViewController;
 - (instancetype)initWithDrawerViewController:(UIViewController *)drawerViewController;
 
 @end
+
+NS_ASSUME_NONNULL_END

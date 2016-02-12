@@ -2,7 +2,7 @@
 //  SPLDrawerViewController.m
 //
 //  The MIT License (MIT)
-//  Copyright (c) 2014 Oliver Letterer, Sparrow-Labs
+//  Copyright (c) 2014-2016 Oliver Letterer, Sparrow-Labs
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -83,7 +83,7 @@
 
 #pragma mark - Initialization
 
-- (id)initWithFrame:(CGRect)frame
+- (instancetype)initWithFrame:(CGRect)frame
 {
     if (self = [super initWithFrame:frame]) {
         // Initialization code
@@ -148,6 +148,8 @@
 
 @end
 
+
+
 @implementation SPLDrawerViewController
 
 #pragma mark - setters and getters
@@ -193,13 +195,7 @@
 
 - (BOOL)isInCompactHorizontalSizeClass
 {
-#ifdef __IPHONE_8_0
-    if ([self respondsToSelector:@selector(traitCollection)]) {
-        return self.traitCollection.horizontalSizeClass == UIUserInterfaceSizeClassCompact;
-    }
-#endif
-
-    return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone;
+    return self.traitCollection.horizontalSizeClass == UIUserInterfaceSizeClassCompact;
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle
@@ -380,7 +376,9 @@
 
 - (void)dynamicAnimatorDidPause:(UIDynamicAnimator *)animator
 {
-    self.animationCompletionHandler();
+    if (self.animationCompletionHandler != nil) {
+        self.animationCompletionHandler();
+    }
 }
 
 #pragma mark - UICollisionBehaviorDelegate
@@ -393,7 +391,7 @@
         self.collisionCount++;
     }
 
-    if (self.collisionCount == 2) {
+    if (self.collisionCount == 2 && self.animationCompletionHandler != nil) {
         self.animationCompletionHandler();
     }
 }
@@ -422,30 +420,17 @@
 
 - (void)_loadDrawerView
 {
-#ifdef __IPHONE_8_0
-    if ([UIVisualEffectView class]) {
-        UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-        UIVisualEffectView *drawerView = [[UIVisualEffectView alloc] initWithEffect:effect];
-        drawerView.frame = self.view.bounds;
+    UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
+    UIVisualEffectView *drawerView = [[UIVisualEffectView alloc] initWithEffect:effect];
+    drawerView.frame = self.view.bounds;
 
-        UIVisualEffectView *vibrancyEffectView = [[UIVisualEffectView alloc] initWithEffect:[UIVibrancyEffect effectForBlurEffect:effect]];
-        vibrancyEffectView.frame = drawerView.bounds;
-        vibrancyEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [drawerView.contentView addSubview:vibrancyEffectView];
+    UIVisualEffectView *vibrancyEffectView = [[UIVisualEffectView alloc] initWithEffect:[UIVibrancyEffect effectForBlurEffect:effect]];
+    vibrancyEffectView.frame = drawerView.bounds;
+    vibrancyEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [drawerView.contentView addSubview:vibrancyEffectView];
 
-        _drawerView = drawerView;
-        _drawerContainerView = vibrancyEffectView.contentView;
-
-        [self.view addSubview:_drawerView];
-        return;
-    }
-#endif
-
-    UINavigationBar *navigationBar = [[UINavigationBar alloc] initWithFrame:self.view.bounds];
-    navigationBar.barTintColor = [UIColor blackColor];
-
-    _drawerView = navigationBar;
-    _drawerContainerView = navigationBar;
+    _drawerView = drawerView;
+    _drawerContainerView = vibrancyEffectView.contentView;
 
     [self.view addSubview:_drawerView];
 }
